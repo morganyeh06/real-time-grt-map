@@ -28,7 +28,7 @@ async function fetchProtobuf(feedName) {
         return GtfsRealtimeBindings.transit_realtime.FeedMessage.decode(new Uint8Array(response.data));
     } catch (error) {
         // if one feed fails (e.g., alerts are down), return an empty array so the rest can continue
-        console.error(`⚠️ ${feedName} feed unavailable:`, error.message);
+        console.error(`${feedName} feed unavailable:`, error.message);
         return { entity: [] }; 
     }
 }
