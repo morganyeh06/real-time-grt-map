@@ -1,6 +1,5 @@
 node_modules/
 .env
-dist/
 # don't commit GTFS static files
 server/data/*.zip
 server/data/*.txt
