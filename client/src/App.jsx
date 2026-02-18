@@ -136,7 +136,7 @@ function App() {
         <div className="flex flex-col">
           <h1 className="flex items-center gap-2 text-xl font-bold leading-none">
             <Bus size={24} /> 
-            <span>GRT Assistant</span>
+            <span>Real-Time GRT Map</span>
           </h1>
           {/* time last updated */}
           <div className="text-[10px] text-blue-200 uppercase tracking-wider font-bold mt-1.5 flex items-center gap-1.5 leading-none">
@@ -227,7 +227,7 @@ function App() {
             </div>
             <div className="p-3 bg-gray-50 border-t text-center">
               <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest flex items-center justify-center gap-1.5">
-                GRT Real-Time Feed
+                GRT Live Feed
               </p>
             </div>
           </aside>
