@@ -2,7 +2,7 @@
   "name": "grt-assistant-server",
   "version": "1.0.0",
   "description": "Backend for real-time GRT map",
-  "main": "index.js",
+  "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
     "dev": "nodemon index.js"
@@ -11,7 +11,9 @@
     "axios": "^1.6.0",
     "cors": "^2.8.5",
     "express": "^4.18.2",
-    "path": "^0.12.7"
+    "path": "^0.12.7",
+    "gtfs-realtime-bindings": "^1.1.1",
+    "protobufjs": "^7.2.5"
   },
   "engines": {
     "node": ">=18.0.0"
