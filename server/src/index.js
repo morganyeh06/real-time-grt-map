@@ -20,7 +20,7 @@ app.use(cors());
 app.use(express.json());
 
 // serve from dist folder
-app.use(express.static(path.join(__dirname, 'dist')));
+app.use(express.static(path.join(__dirname, '..', 'dist')));
 
 /**
  * API ROUTES
@@ -43,7 +43,7 @@ app.get('/health', (req, res) => res.send('Server is healthy!'));
 // "catchall" handler: for any request that doesn't match an API route, 
 // send back React's index.html
 app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+    res.sendFile(path.join(__dirname, '..', 'dist', 'index.html'));
 });
 
 /**
