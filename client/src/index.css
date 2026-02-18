@@ -47,35 +47,29 @@ html, body, #root {
   background-color: #7c3aed; /* ION Purple */
 }
 
-/* Filter Scrollbar Styling */
 
-/* hide scrollbar by default for Chrome, Safari, and Edge */
-.hover-scrollbar::-webkit-scrollbar {
-  height: 6px; /* height for horizontal scrollbar */
+
+/* make bus move smoothly when data is updated */
+.leaflet-marker-pane .custom-bus-icon {
+  transition: transform 1s linear !important;
 }
 
-.hover-scrollbar::-webkit-scrollbar-thumb {
-  background-color: transparent; /* invisible by default */
-  border-radius: 10px;
+/* disable transitions during map interaction */
+.leaflet-zoom-anim .custom-bus-icon,
+.leaflet-pan-anim .custom-bus-icon,
+.leaflet-zooming .custom-bus-icon,
+.leaflet-drag-anim .custom-bus-icon {
+  transition: none !important;
 }
 
-/* show scrollbar thumb on hover */
-.hover-scrollbar:hover::-webkit-scrollbar-thumb {
-  background-color: #cbd5e1; /* slate-300 color */
+
+@keyframes pulse-glow {
+  0% { box-shadow: 0 0 5px rgba(147, 51, 234, 0.5); }
+  50% { box-shadow: 0 0 20px rgba(147, 51, 234, 0.8); }
+  100% { box-shadow: 0 0 5px rgba(147, 51, 234, 0.5); }
 }
 
-/* darker color when the user is actually clicking/dragging the bar */
-.hover-scrollbar::-webkit-scrollbar-thumb:hover {
-  background-color: #94a3b8; /* slate-400 color */
-}
 
-/* firefox support */
-.hover-scrollbar {
-  scrollbar-width: thin;
-  scrollbar-color: transparent transparent;
-  transition: scrollbar-color 0.3s ease;
-}
 
-.hover-scrollbar:hover {
-  scrollbar-color: #cbd5e1 transparent;
-}
+.hover-scrollbar::-webkit-scrollbar { height: 4px; width: 4px; }
+.hover-scrollbar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }

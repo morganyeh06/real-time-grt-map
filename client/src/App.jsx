@@ -1,30 +1,71 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 import BusMap from './components/BusMap';
-import { Bus, RefreshCw, Filter, AlertCircle, Info, CheckCircle, X, Clock } from 'lucide-react';
+import { Bus, RefreshCw, Filter, AlertCircle, CheckCircle, X, Clock, Maximize, Navigation, Locate } from 'lucide-react';
 
 /**
- * App.jsx
- * ROLE: Main Application Controller
+ * Calculates straight-line distance between two lat/lng points in KM.
  */
+const getDistance = (lat1, lon1, lat2, lon2) => {
+  const p = Math.PI / 180;
+  const c = Math.cos;
+  const a = 0.5 - c((lat2 - lat1) * p) / 2 + 
+            c(lat1 * p) * c(lat2 * p) * (1 - c((lon2 - lon1) * p)) / 2;
+  return 12742 * Math.asin(Math.sqrt(a)); 
+};
+
+/**
+ * filter component
+ */
+const RouteCategory = ({ title, routes, selectedRoutes, toggleRoute }) => {
+  if (routes.length === 0) return null;
+  return (
+    <div className="mb-6 last:mb-0">
+      <h3 className="px-4 py-2 text-[10px] font-black uppercase tracking-widest text-gray-500 bg-gray-50/50 border-y border-gray-100 mb-3">
+        {title} ({routes.length})
+      </h3>
+      <div className="px-4 flex flex-wrap gap-2">
+        {routes.map(route => (
+          <button
+            key={route}
+            onClick={() => toggleRoute(route)}
+            className={`px-3 py-1.5 rounded-full text-[11px] font-bold transition-all border ${
+              selectedRoutes.includes(route) 
+              ? 'bg-blue-600 text-white border-blue-600 shadow-sm' 
+              : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
+            }`}
+          >
+            {route === '301' ? 'ION' : route}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 function App() {
   const [vehicles, setVehicles] = useState([]);
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedRoute, setSelectedRoute] = useState(null);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [selectedRoutes, setSelectedRoutes] = useState([]);
+  
+  // sidebar visibility states
+  const [isRouteSidebarOpen, setIsRouteSidebarOpen] = useState(false);
+  const [isAlertSidebarOpen, setIsAlertSidebarOpen] = useState(false);
+  
   const [lastUpdated, setLastUpdated] = useState(null);
+  const [fitTrigger, setFitTrigger] = useState(0);
+  const [ionStatus, setIonStatus] = useState('connecting');
+  const [userLocation, setUserLocation] = useState(null);
 
   const fetchTransitData = async () => {
-    setLoading(true); // Start spinning
+    setLoading(true);
     try {
       const res = await axios.get('http://localhost:5001/api/transit');
-      setVehicles(res.data.vehicles);
+      setVehicles(res.data.vehicles || []);
       setAlerts(res.data.alerts || []);
+      setIonStatus(res.data.ionStatus);
       setLastUpdated(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
-      
-      // Artificial delay or immediate stop? 
-      // We'll stop loading immediately on success.
       setLoading(false); 
     } catch (err) {
       console.error("Failed to fetch transit data:", err);
@@ -38,14 +79,57 @@ function App() {
     return () => clearInterval(interval);
   }, []);
 
-  // computed logic
-  const uniqueBusRoutes = [...new Set(vehicles.map(v => v.routeId).filter(r => r !== '301'))]
-    .sort((a, b) => parseInt(a) - parseInt(b));
-  const filteredVehicles = selectedRoute ? vehicles.filter(v => v.routeId === selectedRoute) : vehicles;
-  const filteredAlerts = selectedRoute ? alerts.filter(a => a.affectedRoutes.includes(selectedRoute)) : alerts;
+  const handleFindMe = () => {
+    if (!navigator.geolocation) return alert("Geolocation not supported");
+    navigator.geolocation.getCurrentPosition((pos) => {
+        setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        setFitTrigger(prev => prev + 1);
+    });
+  };
+
+  const toggleRoute = (routeId) => {
+    setSelectedRoutes(prev => 
+      prev.includes(routeId) ? prev.filter(r => r !== routeId) : [...prev, routeId]
+    );
+  };
+
+  const toggleAlertSidebar = () => {
+    setIsAlertSidebarOpen(!isAlertSidebarOpen);
+    setIsRouteSidebarOpen(false);
+  };
+
+  const toggleRouteSidebar = () => {
+    setIsRouteSidebarOpen(!isRouteSidebarOpen);
+    setIsAlertSidebarOpen(false);
+  };
+
+  const uniqueBusRoutes = useMemo(() => {
+      return [...new Set(vehicles.map(v => v.routeId))].sort((a, b) => parseInt(a) - parseInt(b));
+  }, [vehicles]);
+
+  const routeCategories = useMemo(() => {
+    const cats = { "Rapid Transit": [], "iXpress": [], "Local Routes": [], "School / Special": [] };
+    uniqueBusRoutes.forEach(id => {
+      const num = parseInt(id);
+      if (id === '301') cats["Rapid Transit"].push(id);
+      else if (num >= 200 && num <= 299) cats["iXpress"].push(id);
+      else if (num < 200) cats["Local Routes"].push(id);
+      else cats["School / Special"].push(id);
+    });
+    return cats;
+  }, [uniqueBusRoutes]);
+
+  const nearestVehicles = useMemo(() => {
+    if (!userLocation) return [];
+    return [...vehicles]
+      .map(v => ({ ...v, distance: getDistance(userLocation.lat, userLocation.lng, v.latitude, v.longitude) }))
+      .sort((a, b) => a.distance - b.distance).slice(0, 5);
+  }, [vehicles, userLocation]);
+
+  const filteredVehicles = selectedRoutes.length > 0 ? vehicles.filter(v => selectedRoutes.includes(v.routeId)) : vehicles;
 
   return (
-    <div className="h-screen w-screen flex flex-col bg-gray-50 overflow-hidden text-slate-900 font-sans">
+    <div className="h-screen w-screen flex flex-col bg-gray-50 overflow-hidden text-slate-900 font-sans text-sm">
       
       {/* header */}
       <header className="bg-blue-900 text-white p-4 flex justify-between items-center shadow-lg z-[1000]">
@@ -54,99 +138,115 @@ function App() {
             <Bus size={24} /> 
             <span>GRT Assistant</span>
           </h1>
-          
-          {/* "last updated" sub heading */}
-          <div className="flex items-center gap-1.5 text-[10px] text-blue-200 mt-1 uppercase tracking-wider font-semibold min-h-[14px]">
-            {loading ? (
-              <RefreshCw size={10} className="animate-spin text-white" />
-            ) : (
-              <Clock size={10} />
-            )}
-            <span>
-              {loading ? 'Updating Feed...' : `Last Updated: ${lastUpdated ?? 'Connecting...'}`}
-            </span>
+          {/* time last updated */}
+          <div className="text-[10px] text-blue-200 uppercase tracking-wider font-bold mt-1.5 flex items-center gap-1.5 leading-none">
+            <Clock size={10} />
+            <span>Last Updated: {lastUpdated ?? 'Connecting...'}</span>
           </div>
         </div>
 
-        <div className="flex items-center gap-4">
-            <button 
-                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-bold transition-all shadow-sm ${
-                    filteredAlerts.length > 0 
-                    ? 'bg-orange-500 hover:bg-orange-400 text-white animate-pulse' 
-                    : 'bg-blue-800 hover:bg-blue-700 text-blue-100'
-                }`}
-            >
-                {filteredAlerts.length > 0 ? <AlertCircle size={16} /> : <CheckCircle size={16} />}
-                {`Service Alerts (${filteredAlerts.length})`}
+        <div className="flex items-center gap-3">
+            <div className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 bg-blue-950/50 rounded-md text-[10px] uppercase font-semibold border border-blue-800/50`}>
+              <div className={`w-2 h-2 rounded-full ${ionStatus === 'live' ? 'bg-green-400' : 'bg-yellow-400 animate-pulse'}`} />
+              <span>ION: {ionStatus}</span>
+            </div>
+
+            <button onClick={() => setFitTrigger(prev => prev + 1)} className="bg-blue-700 hover:bg-blue-600 px-3 py-1.5 rounded-md text-sm font-bold flex items-center gap-2 border border-blue-500/30 transition-all">
+              <Maximize size={16} /> <span className="hidden sm:inline">Fit Map</span>
+            </button>
+
+            <button onClick={toggleAlertSidebar} 
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-bold transition-all border border-transparent
+                ${isAlertSidebarOpen 
+                  ? 'bg-orange-500 text-white shadow-inner' 
+                  : 'bg-blue-800 hover:bg-orange-600 text-white'
+                } ${alerts.length > 0 && !isAlertSidebarOpen ? 'animate-pulse' : ''}`}>
+                <AlertCircle size={16} /> <span>Alerts</span>
+            </button>
+
+            <button onClick={toggleRouteSidebar} 
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-bold transition-all border border-transparent
+                ${isRouteSidebarOpen 
+                  ? 'bg-blue-400 text-white shadow-inner' 
+                  : 'bg-blue-800 hover:bg-blue-500 text-white'
+                }`}>
+                <Filter size={16} /> <span>Filters</span>
             </button>
         </div>
       </header>
-
-      {/* filter toolbar */}
-      <div className="bg-white border-b p-2 flex items-center gap-2 overflow-x-auto shadow-sm z-[999] hover-scrollbar">
-        <div className="flex items-center gap-1 px-3 text-gray-500 border-r border-gray-200 mr-2 shrink-0">
-            <Filter size={16} /> 
-            <span className="text-sm font-semibold uppercase tracking-wider">Filter</span>
-        </div>
-        
-        <button onClick={() => setSelectedRoute(null)} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all shrink-0 ${!selectedRoute ? 'bg-blue-600 text-white shadow-md' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>All</button>
-        <button onClick={() => setSelectedRoute('301')} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all shrink-0 ${selectedRoute === '301' ? 'bg-purple-700 text-white shadow-md' : 'border border-purple-200 text-purple-700 hover:bg-purple-50'}`}>ION Light Rail</button>
-        <div className="h-6 w-px bg-gray-300 mx-1 shrink-0"></div>
-        {uniqueBusRoutes.map(route => (
-            <button key={route} onClick={() => setSelectedRoute(route)} className={`px-4 py-1.5 rounded-md text-sm font-medium whitespace-nowrap transition-all shrink-0 ${selectedRoute === route ? 'bg-blue-600 text-white shadow-md' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>Route {route}</button>
-        ))}
-      </div>
       
-      {/* main content */}
       <div className="flex-1 relative overflow-hidden">
-        <BusMap vehicles={filteredVehicles} />
+        <BusMap vehicles={filteredVehicles} triggerFit={fitTrigger} userLocation={userLocation} />
 
-        {/* service alerts sidebar */}
-        {isSidebarOpen && (
-          <aside className="absolute top-4 right-4 bottom-4 w-80 bg-white/95 backdrop-blur-sm border border-gray-200 shadow-2xl z-[1001] flex flex-col rounded-xl overflow-hidden transition-all duration-300 animate-in slide-in-from-right-8">
-            <div className={`p-4 border-b flex items-center justify-between ${filteredAlerts.length > 0 ? 'bg-orange-50/80' : 'bg-green-50/80'}`}>
-              <div className="flex items-center gap-2">
-                {filteredAlerts.length > 0 
-                  ? <AlertCircle size={18} className="text-orange-600" /> 
-                  : <CheckCircle size={18} className="text-green-600" />
-                }
-                <span className={`font-bold text-sm uppercase tracking-tight ${filteredAlerts.length > 0 ? 'text-orange-800' : 'text-green-800'}`}>
-                  {selectedRoute ? `Route ${selectedRoute}` : 'System Status'}
-                </span>
-              </div>
-              <button onClick={() => setIsSidebarOpen(false)} className="p-1 rounded-md text-gray-400 hover:text-gray-600 hover:bg-black/5 transition-colors">
-                <X size={20} />
-              </button>
+        {/* nearby busses/ion */}
+        {userLocation && (
+          <div className="absolute bottom-24 left-6 z-[1002] w-44 bg-white/95 backdrop-blur-md shadow-xl rounded-xl border border-gray-200 overflow-hidden animate-in slide-in-from-bottom-5">
+            <div className="bg-blue-900 px-3 py-1.5 flex items-center justify-between text-white">
+              <h3 className="text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5"><Navigation size={11} fill="white" /> Nearby</h3>
+              <button onClick={() => setUserLocation(null)}><X size={14} /></button>
             </div>
+            <div className="p-2 space-y-1">
+              {nearestVehicles.map(v => (
+                <div key={v.id} className="flex justify-between items-center py-1 border-b border-gray-50 last:border-0">
+                  <span className={`w-9 h-5 flex items-center justify-center text-[11px] font-bold rounded text-white ${v.type === 'LRT' ? 'bg-purple-600' : 'bg-blue-600'}`}>{v.routeId}</span>
+                  <span className="text-[12px] font-bold text-blue-800 tracking-tight">{v.distance.toFixed(1)} km</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-3 hover-scrollbar">
-              {filteredAlerts.length > 0 ? (
-                filteredAlerts.map((alert, idx) => (
-                  <div key={idx} className="bg-white border border-gray-100 rounded-lg p-3 shadow-sm hover:border-orange-200 transition-all">
-                    <h3 className="font-bold text-xs text-gray-900 mb-1 leading-tight">{alert.header}</h3>
-                    <p className="text-[11px] text-gray-500 leading-relaxed">{alert.description}</p>
-                    <div className="mt-2 flex items-center gap-1 text-[9px] text-gray-400 font-mono">
-                      <Info size={10} />
-                      <span>REF: {alert.id.substring(0, 8)}</span>
-                    </div>
+        {/* location button */}
+        <button onClick={handleFindMe} className="absolute bottom-6 left-6 z-[1005] bg-white text-blue-600 p-4 rounded-full shadow-2xl border border-gray-100 hover:scale-110 hover:bg-blue-50 transition-all shadow-blue-200/50">
+          <Locate size={24} className={userLocation ? "fill-blue-600" : ""} />
+        </button>
+
+        {/* service alerts */}
+        {isAlertSidebarOpen && (
+          <aside className="absolute top-4 right-4 bottom-4 w-80 bg-white shadow-2xl z-[1001] flex flex-col rounded-xl border border-gray-200 overflow-hidden animate-in slide-in-from-right-8">
+            <div className="p-4 border-b flex items-center justify-between bg-orange-50">
+              <h2 className="font-black text-xs uppercase tracking-tighter flex items-center gap-2 text-orange-800"><AlertCircle size={14} /> Service Alerts</h2>
+              <button onClick={() => setIsAlertSidebarOpen(false)} className="hover:bg-orange-100 p-1 rounded-full transition-colors"><X size={20} className="text-orange-400" /></button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              {alerts.length > 0 ? alerts.map((alert, idx) => (
+                <div key={idx} className="bg-orange-50/50 border border-orange-100 rounded-lg p-3">
+                  <h4 className="font-bold text-xs text-orange-900 mb-1 leading-tight">{alert.header}</h4>
+                  <p className="text-[11px] text-orange-700 leading-relaxed">{alert.description}</p>
+                </div>
+              )) : (
+                /* default message */
+                <div className="flex flex-col items-center justify-center h-full text-center px-6">
+                  <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
+                    <CheckCircle size={32} className="text-green-500" />
                   </div>
-                ))
-              ) : (
-                <div className="flex flex-col items-center justify-center h-full text-center p-6 animate-in fade-in zoom-in duration-500">
-                    <div className="w-14 h-14 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-4 shadow-sm">
-                        <CheckCircle size={28} />
-                    </div>
-                    <h3 className="font-bold text-gray-900 text-sm mb-1">Service Normal</h3>
-                    <p className="text-[11px] text-gray-500 leading-normal">
-                        All transit lines are currently operating with no active service notices.
-                    </p>
+                  <h3 className="text-sm font-bold text-green-800 mb-1">No Service Alerts</h3>
+                  <p className="text-xs text-green-600 leading-relaxed">All GRT transit routes are currently running smoothly.</p>
                 </div>
               )}
             </div>
-            
-            <div className="p-3 border-t bg-gray-50/50 text-center">
-                <p className="text-[9px] text-gray-400 uppercase tracking-widest font-semibold">GRT Live Data Feed</p>
+            <div className="p-3 bg-gray-50 border-t text-center">
+              <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest flex items-center justify-center gap-1.5">
+                GRT Real-Time Feed
+              </p>
+            </div>
+          </aside>
+        )}
+
+        {/* filters */}
+        {isRouteSidebarOpen && (
+          <aside className="absolute top-4 right-4 bottom-4 w-80 bg-white shadow-2xl z-[1001] flex flex-col rounded-xl border border-gray-200 overflow-hidden animate-in slide-in-from-right-8">
+            <div className="p-4 border-b flex items-center justify-between bg-white sticky top-0 z-10">
+              <h2 className="font-black text-xs uppercase tracking-tighter flex items-center gap-2 text-blue-900"><Filter size={14} /> Filter Routes</h2>
+              <button onClick={() => setIsRouteSidebarOpen(false)} className="hover:bg-gray-100 p-1 rounded-full transition-colors"><X size={20} className="text-gray-400" /></button>
+            </div>
+            <div className="flex-1 overflow-y-auto py-4 hover-scrollbar">
+              {selectedRoutes.length > 0 && (
+                <div className="px-4 mb-4"><button onClick={() => setSelectedRoutes([])} className="w-full py-2 text-[10px] font-bold text-blue-600 border border-blue-100 rounded-lg hover:bg-blue-50 hover:border-blue-300 transition-all uppercase tracking-widest shadow-sm">Clear All Filters</button></div>
+              )}
+              {Object.entries(routeCategories).map(([title, routes]) => (
+                <RouteCategory key={title} title={title} routes={routes} selectedRoutes={selectedRoutes} toggleRoute={toggleRoute} />
+              ))}
             </div>
           </aside>
         )}
