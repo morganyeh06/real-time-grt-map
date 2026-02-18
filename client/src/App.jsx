@@ -4,7 +4,7 @@ import BusMap from './components/BusMap';
 import { Bus, RefreshCw, Filter, AlertCircle, CheckCircle, X, Clock, Maximize, Navigation, Locate } from 'lucide-react';
 
 /**
- * Calculates straight-line distance between two lat/lng points in KM.
+ * calculates straight-line distance between two lat/lng points in KM
  */
 const getDistance = (lat1, lon1, lat2, lon2) => {
   const p = Math.PI / 180;
