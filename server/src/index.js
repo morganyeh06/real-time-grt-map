@@ -64,7 +64,7 @@ app.get('/health', (req, res) => res.send('Server is healthy!'));
  * START SERVER
  */
 app.listen(PORT, () => {
-    console.log(`Smart GRT Assistant API is live!`);
+    console.log(`Real-Time GRT Map API is live`);
     console.log(`Local Access: http://localhost:${PORT}/api/transit`);
     console.log(`Health Check: http://localhost:${PORT}/health`);
 });
