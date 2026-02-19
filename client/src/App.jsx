@@ -61,7 +61,7 @@ function App() {
   const fetchTransitData = async () => {
     setLoading(true);
     try {
-      const res = await axios.get('http://localhost:5001/api/transit');
+      const res = await axios.get('/api/transit');
       setVehicles(res.data.vehicles || []);
       setAlerts(res.data.alerts || []);
       setIonStatus(res.data.ionStatus);
