@@ -160,7 +160,7 @@ function App() {
                 ${isAlertSidebarOpen 
                   ? 'bg-orange-500 text-white shadow-inner' 
                   : 'bg-blue-800 hover:bg-orange-600 text-white'
-                } ${alerts.length > 0 && !isAlertSidebarOpen ? 'animate-pulse' : ''}`}>
+                } ${alerts.length > 0 && !isAlertSidebarOpen ? '' : ''}`}>
                 <AlertCircle size={16} /> <span>Alerts</span>
             </button>
 
@@ -211,8 +211,15 @@ function App() {
             <div className="flex-1 overflow-y-auto p-4 space-y-3">
               {alerts.length > 0 ? alerts.map((alert, idx) => (
                 <div key={idx} className="bg-orange-50/50 border border-orange-100 rounded-lg p-3">
-                  <h4 className="font-bold text-xs text-orange-900 mb-1 leading-tight">{alert.header}</h4>
-                  <p className="text-[11px] text-orange-700 leading-relaxed">{alert.description}</p>
+                  {/* Updated with dangerouslySetInnerHTML */}
+                  <h4 
+                    className="font-bold text-xs text-orange-900 mb-1 leading-tight"
+                    dangerouslySetInnerHTML={{ __html: alert.header }} 
+                  />
+                  <p 
+                    className="text-[11px] text-orange-700 leading-relaxed"
+                    dangerouslySetInnerHTML={{ __html: alert.description }}
+                  />
                 </div>
               )) : (
                 /* default message */
